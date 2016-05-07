@@ -62,9 +62,12 @@ def get_files(directory, filters=None):
     filters = filters or {}
     for entry in os.scandir(directory):
         entry = Entry(entry)
-        if not entry.filter(filters):
-            continue
-        yield entry
+        if entry.is_dir:
+            # for entry in get_files(entry.path, filters):
+            #     yield entry
+            pass
+        if entry.filter(filters):
+            yield entry
 
 
 class Archiver(object):
