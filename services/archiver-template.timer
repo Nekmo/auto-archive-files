@@ -1,0 +1,11 @@
+[Unit]
+Description=Archiver template
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+Unit=archiver@archiver-template.service
+
+[Install]
+WantedBy=timers.target
+

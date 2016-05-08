@@ -1,0 +1,6 @@
+[Unit]
+Description=Archier
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/archiver %i
