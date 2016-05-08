@@ -73,7 +73,7 @@ def get_files(directory, filters=None):
     filters = filters or {}
     for entry in os.scandir(directory):
         entry = Entry(entry)
-        if entry.is_symlink() and not os.path.exists(entry.path):
+        if entry.is_symlink and not os.path.exists(entry.path):
             # Broken symlinks.
             continue
         if entry.is_dir:
