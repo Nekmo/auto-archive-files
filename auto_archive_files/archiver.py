@@ -143,7 +143,7 @@ class Archiver(object):
             dst = os.path.join(self.config['dst'], relative_dst)
             logger.info('Moving {} to {}'.format(src, dst))
             logger.debug('Creating {} directory if does not exists.'.format(os.path.dirname(dst)))
-            makedirs(os.path.dirname(dst))
+            makedirs(os.path.dirname(dst), exist_ok=True)
             logger.debug('Copying {} to {}'.format(src, dst))
             if copy(src, dst) is False:
                 logger.error('Aborted for {} file on copy.'.format(src))
