@@ -137,7 +137,8 @@ class Archiver(object):
         remove = self.on_fail_decorator(remove)
         makedirs = self.on_fail_decorator(os.makedirs)
         rmdirs = self.on_fail_decorator(remove_empty_directories)
-        for entry in self.list():
+        list = self.on_fail_decorator(self.list)
+        for entry in list():
             src = entry.path
             relative_dst = entry.path.replace(self.config['src'], '').lstrip('/')
             dst = os.path.join(self.config['dst'], relative_dst)
