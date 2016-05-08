@@ -4,6 +4,25 @@ from unittest import TestCase
 
 import shutil
 
+from auto_archive_files.archiver import Entry
+
+
+class FakeEntry(Entry):
+    def __init__(self, path='/FakeEntry', mtime=None, type=None):
+
+        class Entry(object):
+            def __init__(self, path):
+                self.name = path.split('/')[-1]
+                self.path = path
+
+            def stat(self):
+                class St: pass
+                st = St()
+                st.st_mtime = mtime
+                return st
+
+        super(FakeEntry, self).__init__(Entry(path))
+
 
 class MockTreeNode(TestCase):
     tree = [

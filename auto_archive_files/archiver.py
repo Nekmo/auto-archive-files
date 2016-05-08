@@ -63,9 +63,8 @@ def get_files(directory, filters=None):
     for entry in os.scandir(directory):
         entry = Entry(entry)
         if entry.is_dir:
-            # for entry in get_files(entry.path, filters):
-            #     yield entry
-            pass
+            for subentry in get_files(entry.path, filters):
+                yield subentry
         if entry.filter(filters):
             yield entry
 
