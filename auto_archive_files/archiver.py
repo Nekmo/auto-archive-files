@@ -83,6 +83,13 @@ def get_files(directory, filters=None):
             yield entry
 
 
+def remove_empty_directories(path, root='/'):
+    if path.rstrip('/') == root.rstrip('/') or os.listdir(path):
+        return
+    os.rmdir(path)
+    remove_empty_directories(os.path.dirname(path), root)
+
+
 class Archiver(object):
     def __init__(self, config):
         if isinstance(config, six.string_types):
@@ -116,7 +123,7 @@ class Archiver(object):
             except Exception as e:
                 body = 'Error on function {}.\nArgs: {}\nKwargs: {}\Exception: {}'.format(function, args, kwargs, e)
                 if self.config.get('on_file'):
-                    subject_body = ['[Auto Archive Files] FAILED to archive {}'.format(self.config['directory']),
+                    subject_body = ['[Auto Archive Files] FAILED to archive {}'.format(self.config['src']),
                                     body]
                     subprocess.Popen(self.config['on_fail'] + subject_body, env=self.config.get('env', {}))
                 logger.error(body.replace('\n', '  '))
@@ -128,11 +135,15 @@ class Archiver(object):
             shutil.rmtree(path) if os.path.isdir(path) else os.remove(path)
         copy = self.on_fail_decorator(shutil.copy2 if self.config.get('copy_meta') else shutil.copyfile)
         remove = self.on_fail_decorator(remove)
+        makedirs = self.on_fail_decorator(os.makedirs)
+        rmdirs = self.on_fail_decorator(remove_empty_directories)
         for entry in self.list():
             src = entry.path
             relative_dst = entry.path.replace(self.config['src'], '').lstrip('/')
             dst = os.path.join(self.config['dst'], relative_dst)
             logger.info('Moving {} to {}'.format(src, dst))
+            logger.debug('Creating {} directory if does not exists.'.format(os.path.dirname(dst)))
+            makedirs(os.path.dirname(dst))
             logger.debug('Copying {} to {}'.format(src, dst))
             if copy(src, dst) is False:
                 logger.error('Aborted for {} file on copy.'.format(src))
@@ -145,3 +156,5 @@ class Archiver(object):
                 continue
             else:
                 logger.debug('{} has been removed successfully.'.format(src))
+            logger.debug('Remove empty directories in {} directory.'.format(os.path.dirname(src)))
+            rmdirs(os.path.dirname(src), self.config['src'])
