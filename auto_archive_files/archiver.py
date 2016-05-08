@@ -73,6 +73,9 @@ def get_files(directory, filters=None):
     filters = filters or {}
     for entry in os.scandir(directory):
         entry = Entry(entry)
+        if entry.is_symlink() and not os.path.exists(entry.path):
+            # Broken symlinks.
+            continue
         if entry.is_dir:
             for subentry in get_files(entry.path, filters):
                 yield subentry
@@ -123,7 +126,7 @@ class Archiver(object):
     def archive(self):
         def remove(path):
             shutil.rmtree(path) if os.path.isdir(path) else os.remove(path)
-        copy = self.on_fail_decorator(shutil.copy2 if self.config.get('copy_meta') else shutil.copy)
+        copy = self.on_fail_decorator(shutil.copy2 if self.config.get('copy_meta') else shutil.copyfile)
         remove = self.on_fail_decorator(remove)
         for entry in self.list():
             src = entry.path
