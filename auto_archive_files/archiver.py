@@ -12,11 +12,6 @@ import six
 LOG_FORMATTER = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
 logger = logging.getLogger('archiver')
 
-consoleHandler = logging.StreamHandler()
-consoleHandler.setFormatter(LOG_FORMATTER)
-logger.addHandler(consoleHandler)
-
-
 AUTO_ARCHIVE_FILES_CONFIG_DIR = '/etc/auto-archive-files'
 
 
@@ -94,12 +89,14 @@ class Archiver(object):
         self.log_to_file()
 
     def get_config(self, config_path):
-        for candidate in [config_path, '{}/{}.conf'.format(AUTO_ARCHIVE_FILES_CONFIG_DIR.rstrip('/'), config_path)]:
+        for candidate in [config_path, '{}/{}.json'.format(AUTO_ARCHIVE_FILES_CONFIG_DIR.rstrip('/'), config_path)]:
             if os.path.exists(candidate):
                 return json.load(open(candidate))
 
     def log_to_file(self, file=None, logger_to_use=None):
         file = file or self.config['log_file']
+        if not file:
+            return
         logger_to_use = logger_to_use or logger
         fileHandler = logging.FileHandler(file)
         fileHandler.setFormatter(LOG_FORMATTER)
@@ -114,20 +111,23 @@ class Archiver(object):
             try:
                 return function(*args, **kwargs)
             except Exception as e:
+                body = 'Error on function {}.\nArgs: {}\nKwargs: {}\Exception: {}'.format(function, args, kwargs, e)
                 if self.config.get('on_file'):
                     subject_body = ['[Auto Archive Files] FAILED to archive {}'.format(self.config['directory']),
-                                    'Error on function {}.\nArgs: {}\nKwargs: {}\Exception: {}'.format(
-                                        function, args, kwargs, e)]
+                                    body]
                     subprocess.Popen(self.config['on_fail'] + subject_body, env=self.config.get('env', {}))
+                logger.error(body.replace('\n', '  '))
                 return False
         return wrapper
 
     def archive(self):
+        def remove(path):
+            shutil.rmtree(path) if os.path.isdir(path) else os.remove(path)
         copy = self.on_fail_decorator(shutil.copy2 if self.config.get('copy_meta') else shutil.copy)
-        remove = self.on_fail_decorator(shutil.rmtree)
+        remove = self.on_fail_decorator(remove)
         for entry in self.list():
             src = entry.path
-            relative_dst = entry.path.replace(self.config['src'].lstrip('/'))
+            relative_dst = entry.path.replace(self.config['src'], '').lstrip('/')
             dst = os.path.join(self.config['dst'], relative_dst)
             logger.info('Moving {} to {}'.format(src, dst))
             logger.debug('Copying {} to {}'.format(src, dst))
