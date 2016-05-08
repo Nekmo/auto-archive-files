@@ -122,10 +122,11 @@ class Archiver(object):
                 return function(*args, **kwargs)
             except Exception as e:
                 body = 'Error on function {}.\nArgs: {}\nKwargs: {}\Exception: {}'.format(function, args, kwargs, e)
-                if self.config.get('on_file'):
+                if self.config.get('on_error') and self.config['on_error'].get('cmd'):
                     subject_body = ['[Auto Archive Files] FAILED to archive {}'.format(self.config['src']),
                                     body]
-                    subprocess.Popen(self.config['on_fail'] + subject_body, env=self.config.get('env', {}))
+                    subprocess.Popen(self.config['on_error']['cmd'] + subject_body,
+                                     env=self.config['onerror'].get('env', {}))
                 logger.error(body.replace('\n', '  '))
                 return False
         return wrapper
@@ -137,8 +138,8 @@ class Archiver(object):
         remove = self.on_fail_decorator(remove)
         makedirs = self.on_fail_decorator(os.makedirs)
         rmdirs = self.on_fail_decorator(remove_empty_directories)
-        list = self.on_fail_decorator(self.list)
-        for entry in list():
+        ls = self.on_fail_decorator(self.list)
+        for entry in ls():
             src = entry.path
             relative_dst = entry.path.replace(self.config['src'], '').lstrip('/')
             dst = os.path.join(self.config['dst'], relative_dst)
