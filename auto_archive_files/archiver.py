@@ -126,7 +126,7 @@ class Archiver(object):
                     subject_body = ['[Auto Archive Files] FAILED to archive {}'.format(self.config['src']),
                                     body]
                     subprocess.Popen(self.config['on_error']['cmd'] + subject_body,
-                                     env=self.config['onerror'].get('env', {}))
+                                     env=self.config['on_error'].get('env', {}))
                 logger.error(body.replace('\n', '  '))
                 return False
         return wrapper
