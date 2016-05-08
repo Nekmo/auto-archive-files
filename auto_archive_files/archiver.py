@@ -1,7 +1,23 @@
+import json
 import operator
 import os
-
 import time
+import shutil
+import logging
+
+import subprocess
+
+import six
+
+LOG_FORMATTER = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
+logger = logging.getLogger('archiver')
+
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(LOG_FORMATTER)
+logger.addHandler(consoleHandler)
+
+
+AUTO_ARCHIVE_FILES_CONFIG_DIR = '/etc/auto-archive-files'
 
 
 class Entry(object):
@@ -70,4 +86,59 @@ def get_files(directory, filters=None):
 
 
 class Archiver(object):
-    pass
+    def __init__(self, config):
+        if isinstance(config, six.string_types):
+            config = self.get_config(config)
+        assert config is not None
+        self.config = config
+        self.log_to_file()
+
+    def get_config(self, config_path):
+        for candidate in [config_path, '{}/{}.conf'.format(AUTO_ARCHIVE_FILES_CONFIG_DIR.rstrip('/'), config_path)]:
+            if os.path.exists(candidate):
+                return json.load(open(candidate))
+
+    def log_to_file(self, file=None, logger_to_use=None):
+        file = file or self.config['log_file']
+        logger_to_use = logger_to_use or logger
+        fileHandler = logging.FileHandler(file)
+        fileHandler.setFormatter(LOG_FORMATTER)
+        logger_to_use.addHandler(fileHandler)
+
+    def list(self):
+        entries = get_files(self.config['src'], self.config['filters'])
+        return list(filter(lambda x: x not in self.config['exclude'], entries))
+
+    def on_fail_decorator(self, function):
+        def wrapper(*args, **kwargs):
+            try:
+                return function(*args, **kwargs)
+            except Exception as e:
+                if self.config.get('on_file'):
+                    subject_body = ['[Auto Archive Files] FAILED to archive {}'.format(self.config['directory']),
+                                    'Error on function {}.\nArgs: {}\nKwargs: {}\Exception: {}'.format(
+                                        function, args, kwargs, e)]
+                    subprocess.Popen(self.config['on_fail'] + subject_body, env=self.config.get('env', {}))
+                return False
+        return wrapper
+
+    def archive(self):
+        copy = self.on_fail_decorator(shutil.copy2 if self.config.get('copy_meta') else shutil.copy)
+        remove = self.on_fail_decorator(shutil.rmtree)
+        for entry in self.list():
+            src = entry.path
+            relative_dst = entry.path.replace(self.config['src'].lstrip('/'))
+            dst = os.path.join(self.config['dst'], relative_dst)
+            logger.info('Moving {} to {}'.format(src, dst))
+            logger.debug('Copying {} to {}'.format(src, dst))
+            if copy(src, dst) is False:
+                logger.error('Aborted for {} file on copy.'.format(src))
+                continue
+            else:
+                logger.debug('{} has been copied successfully.'.format(src))
+            logger.debug('Deleting {} in source'.format(src))
+            if remove(src) is False:
+                logger.error('It has not deleted the file {}'.format(src))
+                continue
+            else:
+                logger.debug('{} has been removed successfully.'.format(src))

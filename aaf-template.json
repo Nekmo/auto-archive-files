@@ -1,0 +1,2 @@
+{"src": "", "dst": "", "filters": {"type": "file"}, "exclude": [], "on_error": {"cmd": ["command"], "env": {}},
+  "log_file": "", "copy_meta": true}
