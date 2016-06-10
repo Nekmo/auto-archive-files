@@ -104,7 +104,7 @@ class Archiver(object):
                 return json.load(open(candidate))
 
     def log_to_file(self, file=None, logger_to_use=None):
-        file = file or self.config['log_file']
+        file = file or self.config.get('log_file')
         if not file:
             return
         logger_to_use = logger_to_use or logger
@@ -160,3 +160,7 @@ class Archiver(object):
                 logger.debug('{} has been removed successfully.'.format(src))
             logger.debug('Remove empty directories in {} directory.'.format(os.path.dirname(src)))
             rmdirs(os.path.dirname(src), self.config['src'])
+
+    def print_list(self):
+        for file in self.list():
+            print(file.path)

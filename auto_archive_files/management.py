@@ -5,6 +5,7 @@
 import argparse
 import logging
 
+import sys
 from simple_monitor_alert.monitor import Monitors
 from simple_monitor_alert.sma import SMA, SMAService
 
@@ -30,6 +31,37 @@ def create_logger(name, level=logging.INFO):
     logger.addHandler(ch)
 
 
+def set_default_subparser(self, name, args=None):
+    """default subparser selection. Call after setup, just before parse_args()
+    name: is the name of the subparser to call by default
+    args: if set is the argument list handed to parse_args()
+
+    , tested with 2.7, 3.2, 3.3, 3.4
+    it works with 2.6 assuming argparse is installed
+    """
+    subparser_found = False
+    for arg in sys.argv[1:]:
+        if arg in ['-h', '--help']:  # global help if no subparser
+            break
+    else:
+        for x in self._subparsers._actions:
+            if not isinstance(x, argparse._SubParsersAction):
+                continue
+            for sp_name in x._name_parser_map.keys():
+                if sp_name in sys.argv[1:]:
+                    subparser_found = True
+        if not subparser_found:
+            # insert default in first position, this implies no
+            # global options without a sub_parsers specified
+            if args is None:
+                sys.argv.insert(1, name)
+            else:
+                args.insert(0, name)
+
+
+argparse.ArgumentParser.set_default_subparser = set_default_subparser
+
+
 def execute_from_command_line(argv=None):
     """
     A simple method that runs a ManagementUtility.
@@ -46,9 +78,24 @@ def execute_from_command_line(argv=None):
     parser.add_argument('--verbose', help='set logging to COMM',
                         action='store_const', dest='loglevel',
                         const=5, default=logging.INFO)
-    parser.add_argument('config_or_configpath')
+
+    parser.sub = parser.add_subparsers()
+
+    parse_archive = parser.sub.add_parser('archive', help='Archive now.')
+    parse_archive.add_argument('config_or_configpath')
+    parse_archive.set_defaults(which='archive')
+
+    parse_oneshot = parser.sub.add_parser('list', help='Only list files to archive')
+    parse_oneshot.add_argument('config_or_configpath')
+    parse_oneshot.set_defaults(which='list')
+
+
+    parser.set_default_subparser('archive')
     args = parser.parse_args(argv[1:])
 
     create_logger('archiver', args.loglevel)
 
-    Archiver(args.config_or_configpath).archive()
+    if not getattr(args, 'which', None) or args.which == 'archive':
+        Archiver(args.config_or_configpath).archive()
+    elif args.which == 'list':
+        Archiver(args.config_or_configpath).print_list()
