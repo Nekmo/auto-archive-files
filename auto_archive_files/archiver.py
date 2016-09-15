@@ -116,27 +116,30 @@ class Archiver(object):
         entries = get_files(self.config['src'], self.config['filters'])
         return list(filter(lambda x: x not in self.config['exclude'], entries))
 
-    def on_fail_decorator(self, function):
+    def on_fail_decorator(self, function, retries=0):
         def wrapper(*args, **kwargs):
-            try:
-                return function(*args, **kwargs)
-            except Exception as e:
-                body = 'Error on function {}.\nArgs: {}\nKwargs: {}\Exception: {}'.format(function, args, kwargs, e)
-                if self.config.get('on_error') and self.config['on_error'].get('cmd'):
-                    subject_body = ['[Auto Archive Files] FAILED to archive {}'.format(self.config['src']),
-                                    body]
-                    subprocess.Popen(self.config['on_error']['cmd'] + subject_body,
-                                     env=self.config['on_error'].get('env', {}))
-                logger.error(body.replace('\n', '  '))
-                return False
+            for i in range(retries):
+                try:
+                    return function(*args, **kwargs)
+                except Exception as e:
+                    if i < retries:
+                        continue
+                    body = 'Error on function {}.\nArgs: {}\nKwargs: {}\Exception: {}'.format(function, args, kwargs, e)
+                    if self.config.get('on_error') and self.config['on_error'].get('cmd'):
+                        subject_body = ['[Auto Archive Files] FAILED to archive {}'.format(self.config['src']),
+                                        body]
+                        subprocess.Popen(self.config['on_error']['cmd'] + subject_body,
+                                         env=self.config['on_error'].get('env', {}))
+                    logger.error(body.replace('\n', '  '))
+                    return False
         return wrapper
 
     def archive(self):
         def remove(path):
             shutil.rmtree(path) if os.path.isdir(path) else os.remove(path)
-        copy = self.on_fail_decorator(shutil.copy2 if self.config.get('copy_meta') else shutil.copyfile)
+        copy = self.on_fail_decorator(shutil.copy2 if self.config.get('copy_meta') else shutil.copyfile, 3)
         remove = self.on_fail_decorator(remove)
-        makedirs = self.on_fail_decorator(os.makedirs)
+        makedirs = self.on_fail_decorator(os.makedirs, 3)
         rmdirs = self.on_fail_decorator(remove_empty_directories)
         ls = self.on_fail_decorator(self.list)
         for entry in ls():
